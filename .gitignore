@@ -1,0 +1,8 @@
+# Local planning files — never commit these
+COMMIT_PLAN.md
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
