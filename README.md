@@ -11,8 +11,6 @@ A full-stack anime recommendation engine built with FastAPI and Next.js. Enter a
 
 ## Screenshots
 
-> Drop screenshots into a `screenshots/` folder to populate this section.
-
 | Home | Results |
 |------|---------|
 | ![Home](./screenshots/home.png) | ![Results](./screenshots/results.png) |
