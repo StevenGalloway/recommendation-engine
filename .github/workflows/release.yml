@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+
+jobs:
+  publish:
+    name: Build and push Docker images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image tags
+        id: meta
+        run: |
+          SHA=${GITHUB_SHA::8}
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "backend_image=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/animatch-backend" >> $GITHUB_OUTPUT
+          echo "frontend_image=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/animatch-frontend" >> $GITHUB_OUTPUT
+
+      - name: Generate dataset (required for backend image)
+        run: python backend/data/generate_dataset.py
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.backend_image }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.backend_image }}:latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./anime_recommend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=http://localhost:8000
+          tags: |
+            ${{ steps.meta.outputs.frontend_image }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.frontend_image }}:latest

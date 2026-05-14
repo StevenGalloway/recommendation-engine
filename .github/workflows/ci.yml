@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend — lint, test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        working-directory: backend
+        run: ruff check .
+
+      - name: Generate dataset
+        working-directory: backend/data
+        run: python generate_dataset.py
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest tests/ -v --tb=short
+
+  frontend:
+    name: Frontend — lint, type-check, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: anime_recommend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: anime_recommend
+        run: npm ci
+
+      - name: Lint
+        working-directory: anime_recommend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: anime_recommend
+        run: npx tsc --noEmit
+
+      - name: Test
+        working-directory: anime_recommend
+        run: npm test -- --passWithNoTests
+
+      - name: Build
+        working-directory: anime_recommend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+  docker-smoke:
+    name: Docker build smoke test
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate dataset (needed for backend image)
+        run: python backend/data/generate_dataset.py
+
+      - name: Build backend image
+        run: docker build -t animatch-backend:ci ./backend
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000 \
+            -t animatch-frontend:ci \
+            ./anime_recommend
